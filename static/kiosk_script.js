@@ -1,88 +1,115 @@
 document.addEventListener("DOMContentLoaded", function() {
-
-    // --- Get Elements ---
-    const startPassForm = document.getElementById("start-pass-form");
-    const startStudentIdInput = document.getElementById("start-student-id-input");
-    const startMessageArea = document.getElementById("start-message-area");
-
-    const returnPassForm = document.getElementById("return-pass-form");
-    const returnStudentIdInput = document.getElementById("return-student-id-input");
-    const returnMessageArea = document.getElementById("return-message-area");
-
+    const passForm = document.getElementById("pass-form");
+    const studentIdInput = document.getElementById("student-id-input");
+    const messageArea = document.getElementById("message-area");
     const activePassesList = document.getElementById("active-passes-list");
     const passesHeader = document.getElementById("passes-header");
     const capacityIndicator = document.getElementById("capacity-indicator");
 
-    // --- Form Submission for Starting a Pass ---
-    startPassForm.addEventListener("submit", function(event) {
+    passForm.addEventListener("submit", function(event) {
         event.preventDefault();
-        const studentId = startStudentIdInput.value;
+        const studentId = studentIdInput.value.trim();
 
+        if (!studentId) {
+            showMessage("Please enter a Student ID", "error");
+            return;
+        }
+
+        const submitBtn = passForm.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.style.opacity = '0.6';
+
+        checkStudentStatus(studentId, submitBtn);
+    });
+
+    function checkStudentStatus(studentId, submitBtn) {
+        fetch("/api/active_passes")
+            .then(response => response.json())
+            .then(data => {
+                const passes = Array.isArray(data) ? data : (data.passes || []);
+                const isOut = passes.some(pass => pass.student_id === studentId);
+
+                if (isOut) {
+                    returnPass(studentId, submitBtn);
+                } else {
+                    startPass(studentId, submitBtn);
+                }
+            })
+            .catch(error => {
+                console.error("Error:", error);
+                showMessage("Network error. Please try again.", "error");
+                submitBtn.disabled = false;
+                submitBtn.style.opacity = '1';
+            });
+    }
+
+    function startPass(studentId, submitBtn) {
         fetch("/start_pass", {
             method: "POST",
             headers: {"Content-Type": "application/x-www-form-urlencoded"},
-            body: `student_id=${studentId}`
+            body: `student_id=${encodeURIComponent(studentId)}`
         })
         .then(response => response.json())
         .then(data => {
-            showMessage(startMessageArea, data.message, data.success ? "success" : "error");
+            showMessage(data.message, data.success ? "success" : "error");
             if (data.success) {
-                startStudentIdInput.value = ""; // Clear input on success
-                fetchActivePasses(); // Refresh the list immediately
+                studentIdInput.value = "";
+                fetchActivePasses();
             }
+            submitBtn.disabled = false;
+            submitBtn.style.opacity = '1';
+            studentIdInput.focus();
         })
         .catch(error => {
             console.error("Error:", error);
-            showMessage(startMessageArea, "A network error occurred.", "error");
+            showMessage("Network error. Please try again.", "error");
+            submitBtn.disabled = false;
+            submitBtn.style.opacity = '1';
         });
-    });
+    }
 
-    // --- Form Submission for Returning a Pass ---
-    returnPassForm.addEventListener("submit", function(event) {
-        event.preventDefault();
-        const studentId = returnStudentIdInput.value;
-
+    function returnPass(studentId, submitBtn) {
         fetch("/return_by_student_id", {
             method: "POST",
             headers: {"Content-Type": "application/x-www-form-urlencoded"},
-            body: `student_id=${studentId}`
+            body: `student_id=${encodeURIComponent(studentId)}`
         })
         .then(response => response.json())
         .then(data => {
-            showMessage(returnMessageArea, data.message, data.success ? "success" : "error");
+            showMessage(data.message, data.success ? "success" : "error");
             if (data.success) {
-                returnStudentIdInput.value = ""; // Clear input on success
-                fetchActivePasses(); // Refresh the list immediately
+                studentIdInput.value = "";
+                fetchActivePasses();
             }
+            submitBtn.disabled = false;
+            submitBtn.style.opacity = '1';
+            studentIdInput.focus();
         })
         .catch(error => {
             console.error("Error:", error);
-            showMessage(returnMessageArea, "A network error occurred.", "error");
+            showMessage("Network error. Please try again.", "error");
+            submitBtn.disabled = false;
+            submitBtn.style.opacity = '1';
         });
-    });
-
-    // --- Display Messages ---
-    function showMessage(areaElement, text, type) {
-        areaElement.textContent = text;
-        areaElement.className = `message ${type}`;
-        setTimeout(() => {
-            areaElement.textContent = "";
-            areaElement.className = "message";
-        }, 5000); // Message disappears after 5 seconds
     }
 
-    // --- Active Pass Polling ---
+    function showMessage(text, type) {
+        messageArea.textContent = text;
+        messageArea.className = `message ${type}`;
+        setTimeout(() => {
+            messageArea.textContent = "";
+            messageArea.className = "message";
+        }, 5000);
+    }
+
     function fetchActivePasses() {
         fetch("/api/active_passes")
             .then(response => response.json())
             .then(data => {
-                // Handle both old format (array) and new format (object with passes and capacity)
                 if (Array.isArray(data)) {
-                    // Old format - just passes
                     renderPasses(data);
                     updateCapacityIndicator(null);
                 } else {
-                    // New format - object with passes and capacity info
                     renderPasses(data.passes || []);
                     updateCapacityIndicator(data.capacity);
                 }
@@ -92,7 +119,6 @@ document.addEventListener("DOMContentLoaded", function() {
             });
     }
 
-    // --- Update Capacity Indicator ---
     function updateCapacityIndicator(capacity) {
         if (!capacity || !capacity.enabled) {
             capacityIndicator.innerHTML = "";
@@ -103,62 +129,28 @@ document.addEventListener("DOMContentLoaded", function() {
         const current = capacity.current;
         const max = capacity.max;
         const percentage = max > 0 ? (current / max) * 100 : 0;
-        const isNearCapacity = percentage >= 80;
         const isAtCapacity = current >= max;
+        const statusColor = isAtCapacity ? '#ef4444' : percentage >= 80 ? '#f59e0b' : '#10b981';
 
-        // Update header with capacity info
         passesHeader.textContent = `Students Currently Out (${current}/${max})`;
 
-        // Create capacity indicator
-        const statusColor = isAtCapacity ? 'var(--error)' : isNearCapacity ? 'var(--warning)' : 'var(--success)';
-        const statusText = isAtCapacity ? 'At Capacity' : isNearCapacity ? 'Near Capacity' : 'Available';
-
         capacityIndicator.innerHTML = `
-            <div style="
-                background: var(--bg-tertiary); 
-                padding: 16px; 
-                border-radius: 12px; 
-                border: 1px solid var(--border);
-                ${isAtCapacity ? 'border-left: 4px solid var(--error);' : ''}
-            ">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <span style="font-weight: 600; color: var(--text-primary);">Capacity Status</span>
-                    <span style="
-                        color: ${statusColor}; 
-                        font-weight: 600; 
-                        font-size: 0.9rem;
-                        ${isAtCapacity ? 'animation: pulse 2s infinite;' : ''}
-                    ">${statusText}</span>
+            <div style="background: #1a1a1a; padding: 20px; border-radius: 16px; border: 2px solid #333;">
+                <div style="width: 100%; height: 12px; background: #333; border-radius: 6px; overflow: hidden; margin-bottom: 10px;">
+                    <div style="height: 100%; background: ${statusColor}; width: ${percentage}%; transition: all 0.5s ease;"></div>
                 </div>
-                <div style="
-                    width: 100%; 
-                    height: 8px; 
-                    background: var(--border); 
-                    border-radius: 4px; 
-                    overflow: hidden;
-                    margin-bottom: 4px;
-                ">
-                    <div style="
-                        height: 100%; 
-                        background: ${statusColor}; 
-                        width: ${percentage}%; 
-                        transition: all 0.5s ease;
-                        ${isAtCapacity ? 'animation: pulse-bg 2s infinite;' : ''}
-                    "></div>
-                </div>
-                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-muted);">
+                <div style="display: flex; justify-content: space-between; font-size: 0.9rem; color: #a3a3a3;">
                     <span>0</span>
-                    <span>${max}</span>
+                    <span style="color: ${statusColor}; font-weight: 700;">${current} / ${max}</span>
                 </div>
             </div>
         `;
     }
 
-    // --- Render Pass Cards ---
     function renderPasses(passes) {
-        activePassesList.innerHTML = ""; // Clear the list
+        activePassesList.innerHTML = "";
         if (passes.length === 0) {
-            activePassesList.innerHTML = "<p>No students are currently out.</p>";
+            activePassesList.innerHTML = "<p>No students currently out</p>";
             return;
         }
 
@@ -180,12 +172,9 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
 
-    // --- Time Formatting Helper ---
     function formatTime(totalSeconds) {
         const isNegative = totalSeconds < 0;
-        if (isNegative) {
-            totalSeconds = -totalSeconds;
-        }
+        if (isNegative) totalSeconds = -totalSeconds;
         
         const minutes = Math.floor(totalSeconds / 60);
         const seconds = totalSeconds % 60;
@@ -194,21 +183,17 @@ document.addEventListener("DOMContentLoaded", function() {
         return `${sign}${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     }
 
-    // --- Initial Load and Periodic Refresh ---
-    fetchActivePasses(); // Load on page start
-    setInterval(fetchActivePasses, 2000); // Refresh every 2 seconds
-});
+    studentIdInput.addEventListener('focus', function() {
+        this.select();
+    });
 
-// Add CSS for capacity animations
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.5; }
-    }
-    @keyframes pulse-bg {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.7; }
-    }
-`;
-document.head.appendChild(style);
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            studentIdInput.value = '';
+            studentIdInput.focus();
+        }
+    });
+
+    fetchActivePasses();
+    setInterval(fetchActivePasses, 2000);
+});
