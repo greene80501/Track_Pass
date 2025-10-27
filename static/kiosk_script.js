@@ -135,13 +135,13 @@ document.addEventListener("DOMContentLoaded", function() {
         passesHeader.textContent = `Students Currently Out (${current}/${max})`;
 
         capacityIndicator.innerHTML = `
-            <div style="background: #1a1a1a; padding: 20px; border-radius: 16px; border: 2px solid #333;">
-                <div style="width: 100%; height: 12px; background: #333; border-radius: 6px; overflow: hidden; margin-bottom: 10px;">
+            <div style="background: #1a1a1a; padding: 25px; border-radius: 20px; border: 2px solid #333;">
+                <div style="width: 100%; height: 16px; background: #333; border-radius: 8px; overflow: hidden; margin-bottom: 12px;">
                     <div style="height: 100%; background: ${statusColor}; width: ${percentage}%; transition: all 0.5s ease;"></div>
                 </div>
-                <div style="display: flex; justify-content: space-between; font-size: 0.9rem; color: #a3a3a3;">
+                <div style="display: flex; justify-content: space-between; font-size: 1.1rem; color: #a3a3a3; font-weight: 600;">
                     <span>0</span>
-                    <span style="color: ${statusColor}; font-weight: 700;">${current} / ${max}</span>
+                    <span style="color: ${statusColor}; font-weight: 800; font-size: 1.3rem;">${current} / ${max}</span>
                 </div>
             </div>
         `;
@@ -150,7 +150,7 @@ document.addEventListener("DOMContentLoaded", function() {
     function renderPasses(passes) {
         activePassesList.innerHTML = "";
         if (passes.length === 0) {
-            activePassesList.innerHTML = "<p>No students currently out</p>";
+            activePassesList.innerHTML = "<p>✓ All Clear</p>";
             return;
         }
 
