@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Hall Pass System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Theme Toggle -->
+    <div class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+        <svg class="theme-icon light-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"/>
+            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+        </svg>
+        <svg class="theme-icon dark-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+    </div>
+
+    <div class="admin-container">
+        <div class="admin-header">
+            <h1>Admin Dashboard</h1>
+            <div>
+                <a href="/">← Back to Kiosk</a>
+                <a href="{{ url_for('logout') }}" style="margin-left: 15px;">Logout</a>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="admin-tabs">
+            <button class="tab-button active" onclick="openTab(event, 'students-tab')">Students</button>
+            <button class="tab-button" onclick="openTab(event, 'passes-tab')">Passes</button>
+            <button class="tab-button" onclick="openTab(event, 'settings-tab')">Settings</button>
+        </div>
+
+        <!-- Students Tab -->
+        <div id="students-tab" class="tab-content active">
+            <h2>Student Management</h2>
+
+            <!-- Add Student Form -->
+            <div class="add-student-form">
+                <h3>Add New Student</h3>
+                <form id="add-student-form">
+                    <div class="form-group">
+                        <label for="student_id">Student ID</label>
+                        <input type="text" id="student_id" name="student_id" placeholder="Enter student ID" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="first_name">First Name</label>
+                        <input type="text" id="first_name" name="first_name" placeholder="Enter first name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="last_name">Last Name</label>
+                        <input type="text" id="last_name" name="last_name" placeholder="Enter last name" required>
+                    </div>
+                    <button type="submit">Add Student</button>
+                </form>
+                <div id="add-student-message" class="message"></div>
+            </div>
+
+            <!-- CSV Import -->
+            <div style="margin-top: 30px;">
+                <h3>Import Students from CSV</h3>
+                <form id="csv-upload-form" enctype="multipart/form-data">
+                    <div style="display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label for="csv_file">CSV File</label>
+                            <input type="file" id="csv_file" name="csv_file" accept=".csv" required>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <input type="checkbox" id="update_existing" name="update_existing" style="width: auto;">
+                                Update existing students
+                            </label>
+                        </div>
+                        <button type="submit">Import CSV</button>
+                    </div>
+                </form>
+                <div id="csv-message" class="message"></div>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 10px;">
+                    CSV format: student_id, first_name, last_name
+                </p>
+            </div>
+
+            <!-- Search Bar -->
+            <div class="search-bar">
+                <input type="text" id="student-search" placeholder="Search students by ID or name..." onkeyup="filterTable('student-search', 'students-table')">
+            </div>
+
+            <!-- Students Table -->
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Student ID</th>
+                            <th>First Name</th>
+                            <th>Last Name</th>
+                            <th>Total Passes</th>
+                            <th>Total Time Out</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="students-table">
+                        {% for student in students %}
+                        <tr>
+                            <td>{{ student.student_id }}</td>
+                            <td>{{ student.first_name }}</td>
+                            <td>{{ student.last_name }}</td>
+                            <td>{{ student.total_passes }}</td>
+                            <td>{{ (student.total_time_out // 60) }}m {{ student.total_time_out % 60 }}s</td>
+                            <td>
+                                <button class="delete-btn" onclick="deleteStudent('{{ student.student_id }}', '{{ student.first_name }} {{ student.last_name }}')">Delete</button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Passes Tab -->
+        <div id="passes-tab" class="tab-content">
+            <h2>Pass History</h2>
+
+            <!-- Filter Controls -->
+            <div class="filter-controls">
+                <label>
+                    <input type="radio" name="pass-filter" value="all" checked onchange="filterPasses()"> All
+                </label>
+                <label>
+                    <input type="radio" name="pass-filter" value="active" onchange="filterPasses()"> Active Only
+                </label>
+                <label>
+                    <input type="radio" name="pass-filter" value="completed" onchange="filterPasses()"> Completed Only
+                </label>
+            </div>
+
+            <!-- Passes Table -->
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Pass ID</th>
+                            <th>Student ID</th>
+                            <th>Student Name</th>
+                            <th>Time Out</th>
+                            <th>Time In</th>
+                            <th>Duration</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="passes-table">
+                        {% for pass in passes %}
+                        <tr class="pass-row" data-status="{{ 'active' if not pass.returned else 'completed' }}">
+                            <td>{{ pass.pass_id }}</td>
+                            <td>{{ pass.student_id }}</td>
+                            <td>{{ pass.first_name }} {{ pass.last_name }}</td>
+                            <td>{{ pass.pass_taken_at }}</td>
+                            <td>{{ pass.return_time if pass.returned else '-' }}</td>
+                            <td>{{ pass.duration_minutes }} min</td>
+                            <td>
+                                <span class="status {{ 'active' if not pass.returned else 'completed' }}">
+                                    {{ 'Active' if not pass.returned else 'Completed' }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if not pass.returned %}
+                                <button class="return-btn" onclick="returnPass({{ pass.pass_id }})">Return</button>
+                                {% else %}
+                                <span style="color: var(--text-muted);">-</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div id="settings-tab" class="tab-content">
+            <h2>System Settings</h2>
+
+            <div class="add-student-form">
+                <h3>Pass Configuration</h3>
+
+                <div class="form-group">
+                    <label for="max_students_out">Maximum Students Out</label>
+                    <input type="number" id="max_students_out" value="{{ settings.max_students_out.value }}" min="1" max="100">
+                    <small style="display: block; color: var(--text-muted); margin-top: 5px;">
+                        {{ settings.max_students_out.description }}
+                    </small>
+                </div>
+
+                <div class="form-group">
+                    <label for="default_pass_duration">Default Pass Duration (minutes)</label>
+                    <input type="number" id="default_pass_duration" value="{{ settings.default_pass_duration.value }}" min="1" max="60">
+                    <small style="display: block; color: var(--text-muted); margin-top: 5px;">
+                        {{ settings.default_pass_duration.description }}
+                    </small>
+                </div>
+
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                        <input type="checkbox" id="enable_capacity_limit" {{ 'checked' if settings.enable_capacity_limit.value == '1' else '' }} style="width: auto;">
+                        <span>Enable Capacity Limit</span>
+                    </label>
+                    <small style="display: block; color: var(--text-muted); margin-top: 5px; margin-left: 30px;">
+                        {{ settings.enable_capacity_limit.description }}
+                    </small>
+                </div>
+
+                <button onclick="saveSettings()">Save Settings</button>
+                <div id="settings-message" class="message"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Theme Management
+        function initTheme() {
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            updateThemeToggle(savedTheme);
+        }
+
+        function toggleTheme() {
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateThemeToggle(newTheme);
+        }
+
+        function updateThemeToggle(theme) {
+            const toggle = document.querySelector('.theme-toggle');
+            if (toggle) toggle.setAttribute('data-theme', theme);
+        }
+
+        initTheme();
+
+        // Tab Management
+        function openTab(evt, tabName) {
+            const tabContent = document.getElementsByClassName('tab-content');
+            for (let i = 0; i < tabContent.length; i++) {
+                tabContent[i].classList.remove('active');
+            }
+
+            const tabButtons = document.getElementsByClassName('tab-button');
+            for (let i = 0; i < tabButtons.length; i++) {
+                tabButtons[i].classList.remove('active');
+            }
+
+            document.getElementById(tabName).classList.add('active');
+            evt.currentTarget.classList.add('active');
+        }
+
+        // Add Student
+        document.getElementById('add-student-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+
+            fetch('/admin/add_student', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                showMessage('add-student-message', data.message, data.success ? 'success' : 'error');
+                if (data.success) {
+                    this.reset();
+                    setTimeout(() => location.reload(), 1500);
+                }
+            })
+            .catch(error => {
+                showMessage('add-student-message', 'Error adding student', 'error');
+            });
+        });
+
+        // CSV Upload
+        document.getElementById('csv-upload-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData();
+            const fileInput = document.getElementById('csv_file');
+            const updateExisting = document.getElementById('update_existing').checked;
+
+            formData.append('csv_file', fileInput.files[0]);
+            formData.append('update_existing', updateExisting ? 'true' : 'false');
+
+            fetch('/admin/import_csv', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                showMessage('csv-message', data.message, data.success ? 'success' : 'error');
+                if (data.success) {
+                    setTimeout(() => location.reload(), 2000);
+                }
+            })
+            .catch(error => {
+                showMessage('csv-message', 'Error uploading CSV', 'error');
+            });
+        });
+
+        // Delete Student
+        function deleteStudent(studentId, studentName) {
+            if (!confirm(`Are you sure you want to delete ${studentName}? This will also delete all their pass history.`)) {
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('student_id', studentId);
+
+            fetch('/admin/delete_student', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch(error => {
+                alert('Error deleting student');
+            });
+        }
+
+        // Return Pass
+        function returnPass(passId) {
+            const formData = new FormData();
+            formData.append('pass_id', passId);
+
+            fetch('/admin/return_pass', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch(error => {
+                alert('Error returning pass');
+            });
+        }
+
+        // Filter Passes
+        function filterPasses() {
+            const filterValue = document.querySelector('input[name="pass-filter"]:checked').value;
+            const rows = document.querySelectorAll('#passes-table .pass-row');
+
+            rows.forEach(row => {
+                const status = row.getAttribute('data-status');
+                if (filterValue === 'all' || status === filterValue) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
+        // Filter Table
+        function filterTable(inputId, tableId) {
+            const input = document.getElementById(inputId);
+            const filter = input.value.toLowerCase();
+            const table = document.getElementById(tableId);
+            const rows = table.getElementsByTagName('tr');
+
+            for (let i = 0; i < rows.length; i++) {
+                const cells = rows[i].getElementsByTagName('td');
+                let found = false;
+
+                for (let j = 0; j < cells.length; j++) {
+                    const cell = cells[j];
+                    if (cell) {
+                        const textValue = cell.textContent || cell.innerText;
+                        if (textValue.toLowerCase().indexOf(filter) > -1) {
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (found) {
+                    rows[i].style.display = '';
+                } else {
+                    rows[i].style.display = 'none';
+                }
+            }
+        }
+
+        // Save Settings
+        function saveSettings() {
+            const maxStudents = document.getElementById('max_students_out').value;
+            const defaultDuration = document.getElementById('default_pass_duration').value;
+            const enableLimit = document.getElementById('enable_capacity_limit').checked ? '1' : '0';
+
+            const promises = [
+                updateSetting('max_students_out', maxStudents),
+                updateSetting('default_pass_duration', defaultDuration),
+                updateSetting('enable_capacity_limit', enableLimit)
+            ];
+
+            Promise.all(promises)
+                .then(() => {
+                    showMessage('settings-message', 'Settings saved successfully!', 'success');
+                })
+                .catch(() => {
+                    showMessage('settings-message', 'Error saving settings', 'error');
+                });
+        }
+
+        function updateSetting(key, value) {
+            const formData = new FormData();
+            formData.append('setting_key', key);
+            formData.append('setting_value', value);
+
+            return fetch('/admin/update_setting', {
+                method: 'POST',
+                body: formData
+            }).then(response => response.json());
+        }
+
+        // Show Message
+        function showMessage(elementId, message, type) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `message ${type}`;
+            element.style.display = 'block';
+
+            setTimeout(() => {
+                element.textContent = '';
+                element.className = 'message';
+                element.style.display = 'none';
+            }, 5000);
+        }
+    </script>
+</body>
+</html>
